@@ -1,0 +1,119 @@
+
+# Codex Brief: IPL Fantasy League (Netlify + Supabase)
+
+## Project Goal
+A private, invite‑only fantasy cricket league for 12 friends.  
+Users pick an XI (11 players) within 100 credits, choose captain (2x) & vice‑captain (1.5x).  
+Points are calculated from live match stats (runs, wickets, catches, etc.).  
+Features: leaderboard, banter wall, weekly trophies, admin override.  
+Deployed on Netlify (Pro plan) with Supabase (PostgreSQL) as database.
+
+## Current State
+- Frontend: React + TypeScript + Vite, Tailwind CSS, lucide‑react icons.
+- Backend: Netlify Functions (Node.js, CommonJS) – each function in `netlify/functions/`.
+- Database: Supabase, schema already created (see below). Seed data partially inserted.
+- Environment variables set in Netlify: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CRICKET_API_KEY` (optional).
+- Build succeeds but **functions return 502 Bad Gateway** – likely due to:
+  - ES module syntax (`import`/`export`) used in some functions instead of CommonJS (`require`/`exports.handler`).
+  - Missing or incorrect error handling.
+  - Possibly missing dependencies (though `@supabase/supabase-js` is in `package.json`).
+
+## Error Logs from Browser Console
+```
+GET /.netlify/functions/leaderboard 502 (Bad Gateway)
+GET /.netlify/functions/matches 502 (Bad Gateway)
+Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received.
+```
+Netlify function logs (not shown) likely indicate syntax errors or unhandled exceptions.
+
+## File Structure
+```
+fantasy-league/
+├── netlify/functions/
+│   ├── league-create.js
+│   ├── league-join.js
+│   ├── players.js
+│   ├── entry-save.js
+│   ├── entry-my-team.js
+│   ├── matches.js
+│   ├── leaderboard.js
+│   ├── chat-list.js
+│   ├── chat-post.js
+│   ├── admin-recalc.js
+│   └── cron.js
+├── src/
+│   ├── components/
+│   │   ├── Layout.tsx, Navbar.tsx, PlayerCard.tsx, LeaderboardRow.tsx,
+│   │   ├── ChatMessage.tsx, CountdownTimer.tsx, PointsGraph.tsx
+│   ├── pages/
+│   │   ├── Landing.tsx, League.tsx, PickXI.tsx, MatchCenter.tsx, Banter.tsx, Admin.tsx
+│   ├── hooks/
+│   │   ├── useAuth.tsx, useMatches.ts, useLeaderboard.ts
+│   ├── utils/
+│   │   ├── api.ts, pointsCalculator.ts
+│   ├── App.tsx, main.tsx, index.css
+├── public/index.html
+├── netlify.toml
+├── package.json (dependencies: react, react-router-dom, @supabase/supabase-js, lucide-react, recharts, date-fns, tailwindcss, vite, etc.)
+├── vite.config.js, tailwind.config.js, postcss.config.js
+└── schema.sql (Supabase tables)
+```
+
+## Key Files That Likely Have Issues
+
+### 1. `netlify/functions/leaderboard.js`
+Current code uses `require`, but there might be a reference to an undefined variable `user_id`. Also check that `event.queryStringParameters` is handled safely.
+
+### 2. `netlify/functions/matches.js`
+Should be CommonJS. Ensure it exports `exports.handler`. Also verify that the query to Supabase is correct (table names, relations).
+
+### 3. `netlify/functions/cron.js`
+Must be CommonJS and must not use ES6 `import`. The scheduled function syntax in `netlify.toml` is correct (`[functions.scheduled.cron]`).
+
+### 4. All other function files – ensure they all start with:
+```js
+const { createClient } = require('@supabase/supabase-js');
+exports.handler = async (event) => { ... };
+```
+
+### 5. Environment variables in functions
+They are accessed via `process.env.SUPABASE_URL` etc. They are set in Netlify dashboard, so that's fine.
+
+## Database Schema (already applied in Supabase)
+Tables: `users`, `leagues`, `league_members`, `teams`, `players`, `matches`, `user_match_entries`, `user_match_entry_players`, `player_match_stats`, `leaderboard_snapshots`, `chat_messages`.  
+Seed data: Admin user (id=1), league (id=1), 4 teams, 10 players, one match scheduled for tomorrow.
+
+## What Needs to Be Fixed
+1. **Convert any ES module syntax to CommonJS** in all function files (no `import`, `export default`).
+2. **Fix `leaderboard.js`** – ensure `matchId` is extracted correctly and no undefined variables.
+3. **Add error handling** to all functions – wrap logic in `try/catch` and return proper HTTP status codes.
+4. **Test functions locally** using Netlify CLI (`netlify dev`) to see detailed error messages.
+5. **Verify that all function endpoints match the frontend calls**:
+   - `api.get('matches')` → calls `/.netlify/functions/matches`
+   - `api.get('leaderboard?matchId=...')` → calls `/.netlify/functions/leaderboard`
+   - `api.post('entry-save', data)` → calls `/.netlify/functions/entry-save`
+   - etc.
+6. **Ensure that the cron job (`cron.js`) does not break the build** – it can be temporarily disabled by commenting out the `[functions.scheduled]` section in `netlify.toml` if needed.
+
+## Immediate Next Steps for Codex
+1. Read all `netlify/functions/*.js` files and rewrite them to pure CommonJS with proper error handling.
+2. Update `netlify.toml` if necessary (maybe simplify by removing the scheduled function temporarily).
+3. Provide a corrected version of `leaderboard.js` and `matches.js` that definitely work.
+4. Instruct the user to run `netlify dev` locally to debug functions, then redeploy.
+
+## Success Criteria
+- Visiting the site shows the landing page with the sample match.
+- Clicking "Pick Your XI" loads the player list from Supabase (via the `players` function).
+- Submitting a team saves to the database and redirects to the match center.
+- Leaderboard displays (even if empty) without 502 errors.
+- No browser console errors related to function calls.
+
+## Additional Notes
+- The frontend `api.ts` uses `/` to join BASE_URL and endpoint – ensure no double slashes.
+- The user authentication is minimal (invite code + localStorage). That's fine for v1.
+- The cricket API is optional; for now, the app should work without it (just show placeholder data).
+
+Hand over to Codex with this brief, and ask it to produce a complete, corrected set of Netlify function files and any necessary frontend tweaks.
+```
+
+You can now provide this brief to Codex (or any AI assistant) and ask it to generate the fixed code. It contains all context, errors, and requirements.

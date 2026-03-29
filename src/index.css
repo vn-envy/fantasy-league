@@ -1,0 +1,21 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-tech-dark text-white font-mono;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-tech-light/80 backdrop-blur-sm border border-white/10 rounded-xl shadow-lg;
+  }
+  .btn-primary {
+    @apply px-4 py-2 bg-neon-blue text-tech-dark font-bold rounded-lg hover:bg-neon-pink transition-all duration-300;
+  }
+  .btn-secondary {
+    @apply px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all;
+  }
+}
